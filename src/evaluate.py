@@ -105,9 +105,9 @@ def evaluate(cfg: Config, checkpoint: str = "checkpoints/best.pt"):
     out_dir = Path("outputs")
     out_dir.mkdir(exist_ok=True)
 
-    _save_5col_grid(samples, out_dir)
-    _save_full_overlay(samples[:6], out_dir, mean_f1)
-    _save_readme_overview(samples[:6], out_dir, mean_f1)
+    _save_5col_grid(samples[:4], out_dir)
+    _save_full_overlay(samples[:4], out_dir, mean_f1)
+    _save_readme_overview(samples[:4], out_dir, mean_f1)
 
     print(f"  eval_samples.png      : grille 5 colonnes")
     print(f"  readme_overlay.png    : prédictions superposées sur RGB")
@@ -165,15 +165,16 @@ def _full_overlay(rgb: np.ndarray, inst: np.ndarray) -> np.ndarray:
 
 def _save_5col_grid(samples: list, out_dir: Path):
     """
-    RGB | GT sémantique | Pred sémantique | GT instances | Pred instances
+    Grille (5 cols × N lignes) : RGB | GT sem | Pred sem | GT inst | Pred inst
+    Layout horizontal : chaque colonne = une vue, chaque ligne = un exemple.
     """
     n = len(samples)
-    fig, axes = plt.subplots(n, 5, figsize=(20, 4 * n))
+    fig, axes = plt.subplots(n, 5, figsize=(20, 4.2 * n),
+                             gridspec_kw={"wspace": 0.03, "hspace": 0.08})
     if n == 1:
         axes = axes[np.newaxis, :]
 
-    titles = ["RGB", "GT semantic", "Pred semantic", "GT instances", "Pred instances"]
-    for ax, t in zip(axes[0], titles):
+    for ax, t in zip(axes[0], ["RGB", "GT semantic", "Pred semantic", "GT instances", "Pred instances"]):
         ax.set_title(t, fontsize=10, fontweight="bold")
 
     for row, (image, gt_mask, pred_mask, gt_inst, pred_inst, f1) in enumerate(samples):
@@ -188,7 +189,6 @@ def _save_5col_grid(samples: list, out_dir: Path):
         axes[row, 0].set_ylabel(f"F1={f1:.2f}", fontsize=9, rotation=0,
                                 labelpad=32, va="center")
 
-    fig.tight_layout()
     fig.savefig(out_dir / "eval_samples.png", bbox_inches="tight", dpi=120)
     plt.close(fig)
 
@@ -197,26 +197,26 @@ def _save_5col_grid(samples: list, out_dir: Path):
 
 def _save_full_overlay(samples: list, out_dir: Path, mean_f1: float):
     """
-    Deux colonnes : image RGB brute | champs + contours superposés.
-    Conçu pour illustrer d'un coup d'œil ce que fait le modèle.
+    Grille 2 lignes × N colonnes : ligne du haut = RGB, ligne du bas = overlay.
+    Format paysage, compact pour le README.
     """
     n = len(samples)
-    fig, axes = plt.subplots(n, 2, figsize=(8, 3.6 * n),
+    fig, axes = plt.subplots(2, n, figsize=(4.2 * n, 9),
                              gridspec_kw={"wspace": 0.03, "hspace": 0.06})
-    if n == 1:
-        axes = axes[np.newaxis, :]
 
-    axes[0, 0].set_title("Sentinel-2 input", fontsize=12, fontweight="bold",
-                          color="white", pad=6)
-    axes[0, 1].set_title(f"Detected fields  (Instance F1={mean_f1:.3f})",
-                          fontsize=12, fontweight="bold", color="white", pad=6)
+    row_labels = ["Sentinel-2 input", f"Detected fields  (avg F1={mean_f1:.3f})"]
 
-    for row, (image, gt_mask, pred_mask, gt_inst, pred_inst, f1) in enumerate(samples):
+    for col, (image, gt_mask, pred_mask, gt_inst, pred_inst, f1) in enumerate(samples):
         rgb = _to_rgb(image)
-        axes[row, 0].imshow(rgb)
-        axes[row, 1].imshow(_full_overlay(rgb, pred_inst))
-        for ax in axes[row]:
-            ax.axis("off")
+        axes[0, col].imshow(rgb)
+        axes[1, col].imshow(_full_overlay(rgb, pred_inst))
+        for row in range(2):
+            axes[row, col].axis("off")
+
+    for row, label in enumerate(row_labels):
+        axes[row, 0].text(-0.02, 0.5, label, transform=axes[row, 0].transAxes,
+                          fontsize=11, fontweight="bold", color="white",
+                          ha="right", va="center", rotation=90)
 
     fig.patch.set_facecolor("#0d1117")
     for ax in axes.flat:
@@ -231,26 +231,29 @@ def _save_full_overlay(samples: list, out_dir: Path, mean_f1: float):
 
 def _save_readme_overview(samples: list, out_dir: Path, mean_f1: float):
     """
-    RGB | GT instances | Pred instances
+    Grille 3 lignes × N colonnes : RGB / ground truth / prédiction.
+    Format paysage, compact pour le README.
     """
     n = len(samples)
-    fig, axes = plt.subplots(n, 3, figsize=(11, 3.6 * n),
-                             gridspec_kw={"wspace": 0.04, "hspace": 0.06})
-    if n == 1:
-        axes = axes[np.newaxis, :]
+    fig, axes = plt.subplots(3, n, figsize=(4.2 * n, 13),
+                             gridspec_kw={"wspace": 0.03, "hspace": 0.06})
 
-    for ax, t in zip(axes[0], ["Sentinel-2 (RGB)", "Ground truth", "Prediction"]):
-        ax.set_title(t, fontsize=12, fontweight="bold", color="white", pad=6)
+    row_labels = ["Sentinel-2 (RGB)", "Ground truth", "Prediction"]
 
-    for row, (image, gt_mask, pred_mask, gt_inst, pred_inst, f1) in enumerate(samples):
+    for col, (image, gt_mask, pred_mask, gt_inst, pred_inst, f1) in enumerate(samples):
         rgb = _to_rgb(image)
-        axes[row, 0].imshow(rgb)
-        axes[row, 1].imshow(_full_overlay(rgb, gt_inst))
-        axes[row, 2].imshow(_full_overlay(rgb, pred_inst))
-        for ax in axes[row]:
-            ax.axis("off")
-        axes[row, 2].text(0.98, 0.03, f"F1={f1:.2f}",
-                          transform=axes[row, 2].transAxes,
+        axes[0, col].imshow(rgb)
+        axes[1, col].imshow(_full_overlay(rgb, gt_inst))
+        axes[2, col].imshow(_full_overlay(rgb, pred_inst))
+        for row in range(3):
+            axes[row, col].axis("off")
+
+    for row, label in enumerate(row_labels):
+        axes[row, 0].text(-0.02, 0.5, label, transform=axes[row, 0].transAxes,
+                          fontsize=11, fontweight="bold", color="white",
+                          ha="right", va="center", rotation=90)
+        axes[2, col].text(0.97, 0.03, f"F1={f1:.2f}",
+                          transform=axes[2, col].transAxes,
                           fontsize=8, color="white", ha="right", va="bottom",
                           bbox=dict(boxstyle="round,pad=0.2", fc="black", alpha=0.6))
 

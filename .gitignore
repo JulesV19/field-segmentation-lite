@@ -1,0 +1,45 @@
+# Data
+data/
+
+# Checkpoints (volumineux — partager via release ou lien externe)
+checkpoints/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environnement virtuel
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
+.AppleDouble
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+*.log
+wandb/
+
+# Claude Code
+.claude/
+
+#Others
+CLAUDE.md
+
+colab_train.ipynb
